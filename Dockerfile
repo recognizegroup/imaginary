@@ -49,6 +49,8 @@ RUN go mod download
 # Copy imaginary sources
 COPY . .
 
+RUN patch /go/pkg/mod/gopkg.in/h2non/bimg*/resizer.go smartcrop.patch
+
 # Run quality control
 RUN go test -test.v -test.race -test.covermode=atomic ./...
 RUN golangci-lint run ./...
