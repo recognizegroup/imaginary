@@ -1,9 +1,9 @@
-ARG GOLANG_VERSION=1.13.7
+ARG GOLANG_VERSION=1.14
 FROM golang:${GOLANG_VERSION} as builder
 
 ARG IMAGINARY_VERSION=dev
-ARG LIBVIPS_VERSION=8.9.1
-ARG GOLANGCILINT_VERSION=1.23.3
+ARG LIBVIPS_VERSION=8.10.0
+ARG GOLANGCILINT_VERSION=1.29.0
 
 # Installs libvips + required libraries
 RUN DEBIAN_FRONTEND=noninteractive \
@@ -14,7 +14,8 @@ RUN DEBIAN_FRONTEND=noninteractive \
   gobject-introspection gtk-doc-tools libglib2.0-dev libjpeg62-turbo-dev libpng-dev \
   libwebp-dev libtiff5-dev libgif-dev libexif-dev libxml2-dev libpoppler-glib-dev \
   swig libmagickwand-dev libpango1.0-dev libmatio-dev libopenslide-dev libcfitsio-dev \
-  libgsf-1-dev fftw3-dev liborc-0.4-dev librsvg2-dev libmagick++-dev libmagickcore-dev libmagick++-6-headers libmagickcore-6-headers && \
+  libmagick++-dev libmagickcore-dev libmagick++-6-headers libmagickcore-6-headers \
+  libgsf-1-dev fftw3-dev liborc-0.4-dev librsvg2-dev libimagequant-dev libheif-dev && \
   cd /tmp && \
   curl -fsSLO https://github.com/libvips/libvips/releases/download/v${LIBVIPS_VERSION}/vips-${LIBVIPS_VERSION}.tar.gz && \
   tar zvxf vips-${LIBVIPS_VERSION}.tar.gz && \
@@ -49,11 +50,9 @@ RUN go mod download
 # Copy imaginary sources
 COPY . .
 
-RUN patch /go/pkg/mod/gopkg.in/h2non/bimg*/resizer.go smartcrop.patch
-
 # Run quality control
-RUN go test -test.v -test.race -test.covermode=atomic ./...
-RUN golangci-lint run ./...
+RUN go test -test.v -test.race -test.covermode=atomic .
+RUN golangci-lint run .
 
 # Compile imaginary
 RUN go build -a \
@@ -80,10 +79,10 @@ COPY --from=builder /etc/ssl/certs /etc/ssl/certs
 RUN DEBIAN_FRONTEND=noninteractive \
   apt-get update && \
   apt-get install --no-install-recommends -y \
-  libglib2.0-0 libjpeg62-turbo libpng16-16 libopenexr23 \
+  procps libglib2.0-0 libjpeg62-turbo libpng16-16 libopenexr23 \
   libwebp6 libwebpmux3 libwebpdemux2 libtiff5 libgif7 libexif12 libxml2 libpoppler-glib8 \
   libmagickwand-6.q16-6 libpango1.0-0 libmatio4 libopenslide0 \
-  libgsf-1-114 fftw3 liborc-0.4-0 librsvg2-2 libcfitsio7 imagemagick ghostscript && \
+  libgsf-1-114 fftw3 liborc-0.4-0 librsvg2-2 libcfitsio7 libimagequant0 libheif1 imagemagick ghostscript && \
   apt-get autoremove -y && \
   apt-get autoclean && \
   apt-get clean && \
@@ -92,6 +91,9 @@ RUN DEBIAN_FRONTEND=noninteractive \
 
 # Server port to listen
 ENV PORT 9000
+
+# Drop privileges for non-UID mapped environments
+USER nobody
 
 # Run the entrypoint command by default when the container starts.
 ENTRYPOINT ["/usr/local/bin/imaginary"]

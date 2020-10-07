@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/h2non/bimg.v1"
+	"github.com/h2non/bimg"
 )
 
 var (
@@ -49,6 +49,7 @@ var (
 	aBurst              = flag.Int("burst", 100, "Throttle burst max cache size")
 	aMRelease           = flag.Int("mrelease", 30, "OS memory release interval in seconds")
 	aCpus               = flag.Int("cpus", runtime.GOMAXPROCS(-1), "Number of cpu cores to use")
+	aLogLevel           = flag.String("log-level", "info", "Define log level for http-server. E.g: info,warning,error")
 )
 
 const usage = `imaginary %s
@@ -71,6 +72,7 @@ Usage:
   imaginary -v | -version
 
 Options:
+
   -a <addr>                  Bind address [default: *]
   -p <port>                  Bind port [default: 8088]
   -h, -help                  Show help
@@ -102,6 +104,8 @@ Options:
   -mrelease <num>            OS memory release interval in seconds [default: 30]
   -cpus <num>                Number of used cpu cores.
                              (default for current machine is %d cores)
+  -log-level                 Set log level for http-server. E.g: info,warning,error [default: info].
+                             Or can use the environment variable GOLANG_LOG=info.
 `
 
 type URLSignature struct {
@@ -110,7 +114,7 @@ type URLSignature struct {
 
 func main() {
 	flag.Usage = func() {
-		_, _ = fmt.Fprint(os.Stderr, fmt.Sprintf(usage, Version, runtime.NumCPU()))
+		_, _ = fmt.Fprint(os.Stderr, usage, Version, runtime.NumCPU())
 	}
 	flag.Parse()
 
@@ -152,6 +156,7 @@ func main() {
 		ForwardHeaders:     parseForwardHeaders(*aForwardHeaders),
 		AllowedOrigins:     parseOrigins(*aAllowedOrigins),
 		MaxAllowedSize:     *aMaxAllowedSize,
+		LogLevel:           getLogLevel(*aLogLevel),
 	}
 
 	// Show warning if gzip flag is passed
@@ -214,10 +219,7 @@ func main() {
 	LoadSources(opts)
 
 	// Start the server
-	err := Server(opts)
-	if err != nil {
-		exitWithError("cannot start the server: %s", err)
-	}
+	Server(opts)
 }
 
 func getPort(port int) int {
@@ -236,6 +238,13 @@ func getURLSignature(key string) URLSignature {
 	}
 
 	return URLSignature{key}
+}
+
+func getLogLevel(logLevel string) string {
+	if logLevelEnv := os.Getenv("GOLANG_LOG"); logLevelEnv != "" {
+		logLevel = logLevelEnv
+	}
+	return logLevel
 }
 
 func showUsage() {

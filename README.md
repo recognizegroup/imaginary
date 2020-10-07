@@ -1,4 +1,4 @@
-# imaginary [![Build Status](https://travis-ci.org/h2non/imaginary.png)](https://travis-ci.org/h2non/imaginary) [![Docker](https://img.shields.io/badge/docker-h2non/imaginary-blue.svg)](https://hub.docker.com/r/h2non/imaginary/) [![Docker Registry](https://img.shields.io/docker/pulls/h2non/imaginary.svg)](https://hub.docker.com/r/h2non/imaginary/) [![Go Report Card](http://goreportcard.com/badge/h2non/imaginary)](https://goreportcard.com/report/h2non/imaginary) [![Fly.io](https://img.shields.io/badge/deploy-fly.io-blue.svg)](https://fly.io/launch/github/h2non/imaginary)
+# imaginary [![Build Status](https://travis-ci.org/h2non/imaginary.svg)](https://travis-ci.org/h2non/imaginary) [![Docker](https://img.shields.io/badge/docker-h2non/imaginary-blue.svg)](https://hub.docker.com/r/h2non/imaginary/) [![Docker Registry](https://img.shields.io/docker/pulls/h2non/imaginary.svg)](https://hub.docker.com/r/h2non/imaginary/) [![Go Report Card](http://goreportcard.com/badge/h2non/imaginary)](https://goreportcard.com/report/h2non/imaginary) [![Fly.io](https://img.shields.io/badge/deploy-fly.io-blue.svg)](https://fly.io/launch/github/h2non/imaginary)
 
 **[Fast](#benchmarks) HTTP [microservice](http://microservices.io/patterns/microservices.html)** written in Go **for high-level image processing** backed by [bimg](https://github.com/h2non/bimg) and [libvips](https://github.com/jcupitt/libvips). `imaginary` can be used as private or public HTTP service for massive image processing with first-class support for [Docker](#docker) & [Fly.io](#flyio).
 It's almost dependency-free and only uses [`net/http`](http://golang.org/pkg/net/http/) native package without additional abstractions for better [performance](#performance).
@@ -6,14 +6,14 @@ It's almost dependency-free and only uses [`net/http`](http://golang.org/pkg/net
 Supports multiple [image operations](#supported-image-operations) exposed as a simple [HTTP API](#http-api),
 with additional optional features such as **API token authorization**, **URL signature protection**, **HTTP traffic throttle** strategy and **CORS support** for web clients.
 
-`imaginary` **can read** images **from HTTP POST payloads**, **server local path** or **remote HTTP servers**, supporting **JPEG**, **PNG**, **WEBP**, and optionally **TIFF**, **PDF**, **GIF** and **SVG** formats if `libvips@8.3+` is compiled with proper library bindings.
+`imaginary` **can read** images **from HTTP POST payloads**, **server local path** or **remote HTTP servers**, supporting **JPEG**, **PNG**, **WEBP**, **HEIF**, and optionally **TIFF**, **PDF**, **GIF** and **SVG** formats if `libvips@8.3+` is compiled with proper library bindings.
 
 `imaginary` is able to output images as JPEG, PNG and WEBP formats, including transparent conversion across them.
 
 `imaginary` also optionally **supports image placeholder fallback mechanism** in case of image processing error or server error of any nature, therefore an image will be always returned by the server in terms of HTTP response body and content MIME type, even in case of error, matching the expected image size and format transparently.
 
-It uses internally `libvips`, a powerful and efficient library written in C for image processing
-which requires a [low memory footprint](http://www.vips.ecs.soton.ac.uk/index.php?title=Speed_and_Memory_Use)
+`imaginary` uses internally `libvips`, a powerful and efficient library written in C for fast image processing
+which requires a [low memory footprint](https://github.com/libvips/libvips/wiki/Benchmarks)
 and it's typically 4x faster than using the quickest ImageMagick and GraphicsMagick
 settings or Go native `image` package, and in some cases it's even 8x faster processing JPEG images.
 
@@ -53,6 +53,7 @@ To get started, take a look the [installation](#installation) steps, [usage](#co
 - Crop
 - SmartCrop (based on [libvips built-in algorithm](https://github.com/jcupitt/libvips/blob/master/libvips/conversion/smartcrop.c))
 - Rotate (with auto-rotate based on EXIF orientation)
+- AutoRotate with further image transformations (based on EXIF metadata orientation)
 - Flip (with auto-flip based on EXIF metadata)
 - Flop
 - Zoom
@@ -71,9 +72,9 @@ To get started, take a look the [installation](#installation) steps, [usage](#co
 
 ## Prerequisites
 
-- [libvips](https://github.com/jcupitt/libvips) 8.3+ (8.5+ recommended)
+- [libvips](https://github.com/jcupitt/libvips) 8.8+ (8.9+ recommended)
 - C compatible compiler such as gcc 4.6+ or clang 3.0+
-- Go 1.11+
+- Go 1.12+
 
 ## Installation
 
@@ -83,7 +84,7 @@ go get -u github.com/h2non/imaginary
 
 Also, be sure you have the latest version of `bimg`:
 ```bash
-go get -u gopkg.in/h2non/bimg.v1
+go get -u github.com/h2non/bimg
 ```
 
 ### libvips
@@ -109,6 +110,16 @@ Start the container with optional flags (default listening on port 9000)
 docker run -p 9000:9000 h2non/imaginary -cors -gzip
 ```
 
+Start the container enabling remote URL source image processing via GET requests and `url` query param.
+```
+docker run -p 9000:9000 h2non/imaginary -p 9000 -enable-url-source
+```
+
+Start the container enabling local directory image process via GET requests and `file` query param.
+```
+docker run -p 9000:9000 h2non/imaginary -p 900 -mount /volume/images
+```
+
 Start the container in debug mode:
 ```
 docker run -p 9000:9000 -e "DEBUG=*" h2non/imaginary
@@ -124,9 +135,13 @@ Stop the container
 docker stop h2non/imaginary
 ```
 
-You can see all the Docker tags [here](https://hub.docker.com/r/h2non/imaginary/tags/).
+For more usage examples, see the [command line usage](#command-line-usage).
 
-Alternatively you may add imaginary to your `docker-compose.yml` file:
+All Docker images tags are available [here](https://hub.docker.com/r/h2non/imaginary/tags/).
+
+#### Docker Compose
+
+You can add `imaginary` to your `docker-compose.yml` file:
 
 ```yaml
 version: "3"
@@ -205,6 +220,24 @@ You can enable it simply passing a flag to the binary:
 $ imaginary -concurrency 20
 ```
 
+### Memory issues
+
+In case you are experiencing any persistent unreleased memory issues in your deployment, you can try passing this environemnt variables to `imaginary`:
+
+```
+MALLOC_ARENA_MAX=2 imaginary -p 9000 -enable-url-source
+```
+
+### Graceful shutdown
+
+When you use a cluster, it is necessary to control how the deployment is executed, and it is very useful to finish the containers in a controlled.
+
+You can use the next command:
+
+```
+$ ps auxw | grep 'bin/imaginary' | awk 'NR>1{print buf}{buf = $2}' | xargs kill -TERM > /dev/null 2>&1
+```
+
 ### Scalability
 
 If you're looking for a large scale solution for massive image processing, you should scale `imaginary` horizontally, distributing the HTTP load across a pool of imaginary servers.
@@ -219,7 +252,7 @@ Assuming that you want to provide a high availability to deal efficiently with, 
         |==============|
         |   Balancer   |
         |==============|
-           |       |   
+           |       |
           /         \
          /           \
         /             \
@@ -230,7 +263,7 @@ Assuming that you want to provide a high availability to deal efficiently with, 
 
 ## Clients
 
-- [node.js/io.js](https://github.com/h2non/node-imaginary)
+- [node.js](https://github.com/h2non/node-imaginary)
 
 Feel free to send a PR if you created a client for other language.
 
@@ -239,7 +272,7 @@ Feel free to send a PR if you created a client for other language.
 libvips is probably the faster open source solution for image processing.
 Here you can see some performance test comparisons for multiple scenarios:
 
-- [libvips speed and memory usage](http://www.vips.ecs.soton.ac.uk/index.php?title=Speed_and_Memory_Use)
+- [libvips speed and memory usage](https://github.com/libvips/libvips/wiki/Benchmarks)
 - [bimg](https://github.com/h2non/bimg#Performance) (Go library with C bindings to libvips)
 
 ## Benchmark
@@ -305,7 +338,7 @@ Options:
   -forward-headers          Forwards custom headers to the image source server. -enable-url-source flag must be defined.
   -enable-url-signature     Enable URL signature (URL-safe Base64-encoded HMAC digest) [default: false]
   -url-signature-key        The URL signature key (32 characters minimum)
-  -allowed-origins <urls>   Restrict remote image source processing to certain origins (separated by commas). Note: Origins are validated against host *AND* path. 
+  -allowed-origins <urls>   Restrict remote image source processing to certain origins (separated by commas). Note: Origins are validated against host *AND* path.
   -max-allowed-size <bytes> Restrict maximum size of http image source (in bytes)
   -certfile <path>          TLS certificate file path
   -keyfile <path>           TLS private key file path
@@ -316,6 +349,8 @@ Options:
   -mrelease <num>           OS memory release interval in seconds [default: 30]
   -cpus <num>               Number of used cpu cores.
                             (default for current machine is 8 cores)
+  -log-level                Set log level for http-server. E.g: info,warning,error [default: info].
+                            Or can use the environment variable GOLANG_LOG=info.
 ```
 
 Start the server in a custom port:
@@ -402,6 +437,11 @@ DEBUG=* imaginary -p 8080
 Or filter debug output by package:
 ```
 DEBUG=imaginary imaginary -p 8080
+```
+
+Disable info logs:
+```
+GOLANG_LOG=error imaginary -p 8080
 ```
 
 #### Examples
@@ -546,7 +586,7 @@ Image measures are always in pixels, unless otherwise indicated.
 - **url**         `string` - Fetch the image from a remote HTTP server. In order to use this you must pass the `-enable-url-source` flag.
 - **colorspace**  `string` - Use a custom color space for the output image. Allowed values are: `srgb` or `bw` (black&white)
 - **field**       `string` - Custom image form field name if using `multipart/form`. Defaults to: `file`
-- **extend**      `string` - Extend represents the image extend mode used when the edges of an image are extended. Allowed values are: `black`, `copy`, `mirror`, `white` and `background`. If `background` value is specified, you can define the desired extend RGB color via `background` param, such as `?extend=background&background=250,20,10`. For more info, see [libvips docs](http://www.vips.ecs.soton.ac.uk/supported/8.4/doc/html/libvips/libvips-conversion.html#VIPS-EXTEND-BACKGROUND:CAPS).
+- **extend**      `string` - Extend represents the image extend mode used when the edges of an image are extended. Defaults to `mirror`. Allowed values are: `black`, `copy`, `mirror`, `white`, `lastpixel` and `background`. If `background` value is specified, you can define the desired extend RGB color via `background` param, such as `?extend=background&background=250,20,10`. For more info, see [libvips docs](https://libvips.github.io/libvips/API/current/libvips-conversion.html#VIPS-EXTEND-BACKGROUND:CAPS).
 - **background**  `string` - Background RGB decimal base color to use when flattening transparent PNGs. Example: `255,200,150`
 - **sigma**       `float`  - Size of the gaussian mask to use when blurring an image. Example: `15.0`
 - **minampl**     `float`  - Minimum amplitude of the gaussian filter to use when blurring an image. Default: Example: `0.5`
@@ -866,6 +906,14 @@ The width and height specify a maximum bounding box for the image.
 #### GET | POST /rotate
 Accepts: `image/*, multipart/form-data`. Content-Type: `image/*`
 
+
+#### GET | POST /autorotate
+Accepts: `image/*, multipart/form-data`. Content-Type: `image/*`
+
+Automatically rotate the image with no further image transformations based on EXIF orientation metadata.
+
+Returns a new image with the same size and format as the input image.
+
 ##### Allowed params
 
 - rotate `int` `required`
@@ -1019,13 +1067,14 @@ Self-documented JSON operation schema:
 - **enlarge** - Same as [`/enlarge`](#get--post-enlarge) endpoint.
 - **extract** - Same as [`/extract`](#get--post-extract) endpoint.
 - **rotate** - Same as [`/rotate`](#get--post-rotate) endpoint.
+- **autorotate** - Same as [`/autorotate`](#get--post-autorotate) endpoint.
 - **flip** - Same as [`/flip`](#get--post-flip) endpoint.
 - **flop** - Same as [`/flop`](#get--post-flop) endpoint.
 - **thumbnail** - Same as [`/thumbnail`](#get--post-thumbnail) endpoint.
 - **zoom** - Same as [`/zoom`](#get--post-zoom) endpoint.
 - **convert** - Same as [`/convert`](#get--post-convert) endpoint.
 - **watermark** - Same as [`/watermark`](#get--post-watermark) endpoint.
-- **watermarkImage** - Same as [`/watermarkimage`](#get--post-watermarkimage) endpoint.
+- **watermarkimage** - Same as [`/watermarkimage`](#get--post-watermarkimage) endpoint.
 - **blur** - Same as [`/blur`](#get--post-blur) endpoint.
 
 ###### Example
