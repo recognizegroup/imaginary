@@ -42,6 +42,8 @@ func TestIsImageTypeSupported(t *testing.T) {
 		{"image/svg", bimg.IsImageTypeSupportedByVips(bimg.SVG).Load},
 		{"image/tiff", bimg.IsImageTypeSupportedByVips(bimg.TIFF).Load},
 		{"application/pdf", bimg.IsImageTypeSupportedByVips(bimg.PDF).Load},
+		{"image/vnd.adobe.photoshop", bimg.IsImageTypeSupportedByVips(bimg.MAGICK).Load},
+		{"application/postscript", bimg.IsImageTypeSupportedByVips(bimg.MAGICK).Load},
 		{"text/plain", false},
 		{"blablabla", false},
 		{"", false},
@@ -70,6 +72,8 @@ func TestImageType(t *testing.T) {
 		{"json", bimg.UNKNOWN},
 		{"text", bimg.UNKNOWN},
 		{"blablabla", bimg.UNKNOWN},
+		{"vnd.adobe.photoshop", bimg.MAGICK},
+		{"postscript", bimg.MAGICK},
 		{"", bimg.UNKNOWN},
 	}
 
@@ -92,6 +96,7 @@ func TestGetImageMimeType(t *testing.T) {
 		{bimg.GIF, "image/gif"},
 		{bimg.PDF, "application/pdf"},
 		{bimg.SVG, "image/svg+xml"},
+		{bimg.MAGICK, "image/vnd.adobe.photoshop"},
 		{bimg.UNKNOWN, "image/jpeg"},
 	}
 
