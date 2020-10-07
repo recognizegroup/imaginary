@@ -22,6 +22,10 @@ func ExtractImageTypeFromMime(mime string) string {
 func IsImageMimeTypeSupported(mime string) bool {
 	format := ExtractImageTypeFromMime(mime)
 
+	if (format == "vnd.adobe.photoshop" || format == "postscript") {
+	  return true
+	}
+
 	// Some payloads may expose the MIME type for SVG as text/xml
 	if format == "xml" {
 		format = "svg"
@@ -47,6 +51,10 @@ func ImageType(name string) bimg.ImageType {
 		return bimg.SVG
 	case "pdf":
 		return bimg.PDF
+	case "vnd.adobe.photoshop":
+		return bimg.MAGICK
+	case "postscript":
+		return bimg.MAGICK
 	default:
 		return bimg.UNKNOWN
 	}
@@ -67,6 +75,8 @@ func GetImageMimeType(code bimg.ImageType) string {
 		return "image/svg+xml"
 	case bimg.PDF:
 		return "application/pdf"
+	case bimg.MAGICK:
+		return "image/vnd.adobe.photoshop"
 	default:
 		return "image/jpeg"
 	}
