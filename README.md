@@ -353,6 +353,9 @@ Options:
                             Or can use the environment variable GOLANG_LOG=info.
 ```
 
+All command line flags have environment variable equivalents. For example the env variable ENABLE_URL_SOURCE can be used
+to configure -enable-url-source
+
 Start the server in a custom port:
 ```bash
 imaginary -p 8080

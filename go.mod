@@ -9,4 +9,5 @@ require (
 	github.com/h2non/bimg v1.1.4
 	github.com/h2non/filetype v1.1.0
 	gopkg.in/throttled/throttled.v2 v2.0.3
+	github.com/namsral/flag v1.7.4-pre
 )

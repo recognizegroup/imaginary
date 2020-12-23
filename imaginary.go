@@ -1,8 +1,8 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"github.com/namsral/flag"
 	"io/ioutil"
 	"log"
 	"net/url"
