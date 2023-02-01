@@ -2,15 +2,15 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"net/url"
-	"log"
 	"os"
 	"os/signal"
-	"syscall"
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -22,6 +22,7 @@ type ServerOptions struct {
 	HTTPReadTimeout    int
 	HTTPWriteTimeout   int
 	MaxAllowedSize     int
+	MaxAllowedPixels   float64
 	CORS               bool
 	Gzip               bool // deprecated
 	AuthForwarding     bool
@@ -43,6 +44,7 @@ type ServerOptions struct {
 	Endpoints          Endpoints
 	AllowedOrigins     []*url.URL
 	LogLevel           string
+	ReturnSize         bool
 }
 
 // Endpoints represents a list of endpoint names to disable.
@@ -110,8 +112,8 @@ func join(o ServerOptions, route string) string {
 func NewServerMux(o ServerOptions) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.Handle(join(o, "/"), Middleware(indexController, o))
-	mux.Handle(join(o, "/form"), Middleware(formController, o))
+	mux.Handle(join(o, "/"), Middleware(indexController(o), o))
+	mux.Handle(join(o, "/form"), Middleware(formController(o), o))
 	mux.Handle(join(o, "/health"), Middleware(healthController, o))
 
 	image := ImageMiddleware(o)

@@ -33,6 +33,7 @@ var (
 	aURLSignatureKey    = flag.String("url-signature-key", "", "The URL signature key (32 characters minimum)")
 	aAllowedOrigins     = flag.String("allowed-origins", "", "Restrict remote image source processing to certain origins (separated by commas). Note: Origins are validated against host *AND* path.")
 	aMaxAllowedSize     = flag.Int("max-allowed-size", 0, "Restrict maximum size of http image source (in bytes)")
+	aMaxAllowedPixels   = flag.Float64("max-allowed-resolution", 18.0, "Restrict maximum resolution of the image (in megapixels)")
 	aKey                = flag.String("key", "", "Define API key for authorization")
 	aMount              = flag.String("mount", "", "Mount server local directory")
 	aCertFile           = flag.String("certfile", "", "TLS certificate file path")
@@ -50,6 +51,7 @@ var (
 	aMRelease           = flag.Int("mrelease", 30, "OS memory release interval in seconds")
 	aCpus               = flag.Int("cpus", runtime.GOMAXPROCS(-1), "Number of cpu cores to use")
 	aLogLevel           = flag.String("log-level", "info", "Define log level for http-server. E.g: info,warning,error")
+	aReturnSize         = flag.Bool("return-size", false, "Return the image size in the HTTP headers")
 )
 
 const usage = `imaginary %s
@@ -94,6 +96,7 @@ Options:
   -url-signature-key         The URL signature key (32 characters minimum)
   -allowed-origins <urls>    Restrict remote image source processing to certain origins (separated by commas)
   -max-allowed-size <bytes>  Restrict maximum size of http image source (in bytes)
+  -max-allowed-resolution <megapixels> Restrict maximum resolution of the image [default: 18.0]
   -certfile <path>           TLS certificate file path
   -keyfile <path>            TLS private key file path
   -authorization <value>     Defines a constant Authorization header value passed to all the image source servers. -enable-url-source flag must be defined. This overwrites authorization headers forwarding behavior via X-Forward-Authorization
@@ -106,6 +109,7 @@ Options:
                              (default for current machine is %d cores)
   -log-level                 Set log level for http-server. E.g: info,warning,error [default: info].
                              Or can use the environment variable GOLANG_LOG=info.
+  -return-size               Return the image size with X-Width and X-Height HTTP header. [default: disabled].
 `
 
 type URLSignature struct {
@@ -114,7 +118,7 @@ type URLSignature struct {
 
 func main() {
 	flag.Usage = func() {
-		_, _ = fmt.Fprint(os.Stderr, usage, Version, runtime.NumCPU())
+		_, _ = fmt.Fprintf(os.Stderr, usage, Version, runtime.NumCPU())
 	}
 	flag.Parse()
 
@@ -156,7 +160,9 @@ func main() {
 		ForwardHeaders:     parseForwardHeaders(*aForwardHeaders),
 		AllowedOrigins:     parseOrigins(*aAllowedOrigins),
 		MaxAllowedSize:     *aMaxAllowedSize,
+		MaxAllowedPixels:   *aMaxAllowedPixels,
 		LogLevel:           getLogLevel(*aLogLevel),
+		ReturnSize:         *aReturnSize,
 	}
 
 	// Show warning if gzip flag is passed
